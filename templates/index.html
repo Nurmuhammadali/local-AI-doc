@@ -1,0 +1,891 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LocalAIdoc — AI Documentation Generator</title>
+  <style>
+    /* ── Reset & base ─────────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:        #0d0f13;
+      --surface:   #161b22;
+      --surface2:  #1c2230;
+      --border:    #2d3748;
+      --accent:    #6366f1;
+      --accent2:   #8b5cf6;
+      --green:     #10b981;
+      --red:       #ef4444;
+      --yellow:    #f59e0b;
+      --text:      #e2e8f0;
+      --muted:     #64748b;
+      --code-bg:   #0a0c10;
+    }
+    html { font-size: 15px; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      min-height: 100vh;
+      line-height: 1.6;
+    }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    /* ── Layout ───────────────────────────────────────────────────────────── */
+    .header {
+      border-bottom: 1px solid var(--border);
+      padding: 1rem 2rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      background: var(--surface);
+    }
+    .logo {
+      font-size: 1.4rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .logo-sub { font-size: 0.75rem; color: var(--muted); margin-left: 0.5rem; -webkit-text-fill-color: var(--muted); }
+    .badge {
+      background: rgba(99,102,241,0.15);
+      border: 1px solid rgba(99,102,241,0.4);
+      color: #a5b4fc;
+      font-size: 0.7rem;
+      padding: 2px 8px;
+      border-radius: 20px;
+    }
+
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 2rem;
+      display: grid;
+      grid-template-columns: 420px 1fr;
+      gap: 1.5rem;
+      align-items: start;
+    }
+    @media (max-width: 860px) {
+      .container { grid-template-columns: 1fr; padding: 1rem; }
+    }
+
+    /* ── Panel ────────────────────────────────────────────────────────────── */
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    .panel-header {
+      padding: 1rem 1.25rem;
+      border-bottom: 1px solid var(--border);
+      font-weight: 600;
+      font-size: 0.9rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .panel-body { padding: 1.25rem; display: flex; flex-direction: column; gap: 1rem; }
+
+    /* ── Form elements ────────────────────────────────────────────────────── */
+    label { font-size: 0.8rem; color: var(--muted); display: block; margin-bottom: 0.35rem; }
+    input[type="text"], input[type="password"], select, textarea {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      padding: 0.6rem 0.85rem;
+      font-size: 0.875rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    input:focus, select:focus, textarea:focus { border-color: var(--accent); }
+    select option { background: var(--surface2); }
+
+    /* ── Tab toggle ───────────────────────────────────────────────────────── */
+    .tabs {
+      display: flex;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 3px;
+      gap: 3px;
+    }
+    .tab {
+      flex: 1;
+      padding: 0.45rem;
+      text-align: center;
+      font-size: 0.82rem;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s;
+      color: var(--muted);
+      border: none;
+      background: transparent;
+    }
+    .tab.active {
+      background: var(--accent);
+      color: white;
+      font-weight: 600;
+    }
+
+    /* ── Doc type cards ───────────────────────────────────────────────────── */
+    .doc-types {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.5rem;
+    }
+    .doc-card {
+      padding: 0.65rem 0.5rem;
+      background: var(--surface2);
+      border: 1.5px solid var(--border);
+      border-radius: 8px;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.2s;
+      font-size: 0.8rem;
+    }
+    .doc-card:hover { border-color: var(--accent); }
+    .doc-card.active { border-color: var(--accent); background: rgba(99,102,241,0.12); color: #a5b4fc; }
+    .doc-card .icon { font-size: 1.1rem; margin-bottom: 0.2rem; }
+    .doc-card .name { font-weight: 600; }
+    .doc-card .desc { font-size: 0.7rem; color: var(--muted); }
+
+    /* ── Provider section ─────────────────────────────────────────────────── */
+    .provider-tabs {
+      display: flex;
+      gap: 0.4rem;
+      flex-wrap: wrap;
+    }
+    .provider-btn {
+      padding: 0.45rem 0.9rem;
+      border: 1.5px solid var(--border);
+      border-radius: 6px;
+      font-size: 0.8rem;
+      cursor: pointer;
+      background: var(--surface2);
+      color: var(--muted);
+      transition: all 0.2s;
+    }
+    .provider-btn:hover { border-color: var(--accent); color: var(--text); }
+    .provider-btn.active { border-color: var(--accent); background: rgba(99,102,241,0.12); color: #a5b4fc; font-weight: 600; }
+    .provider-fields { display: none; margin-top: 0.5rem; }
+    .provider-fields.show { display: flex; flex-direction: column; gap: 0.5rem; }
+
+    /* ── Generate button ──────────────────────────────────────────────────── */
+    .btn-generate {
+      width: 100%;
+      padding: 0.85rem;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border: none;
+      border-radius: 10px;
+      color: white;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.1s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+    }
+    .btn-generate:hover:not(:disabled) { opacity: 0.9; transform: translateY(-1px); }
+    .btn-generate:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* ── File scan preview ────────────────────────────────────────────────── */
+    .file-scan {
+      display: none;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.75rem;
+      font-size: 0.8rem;
+    }
+    .file-scan.show { display: block; }
+    .file-scan-header { display: flex; justify-content: space-between; margin-bottom: 0.4rem; }
+    .file-scan-header span { color: var(--green); font-weight: 600; }
+    .file-list { color: var(--muted); max-height: 90px; overflow-y: auto; font-family: monospace; font-size: 0.72rem; }
+
+    /* ── Output panel ─────────────────────────────────────────────────────── */
+    .output-panel { position: sticky; top: 1.5rem; }
+    .output-header {
+      padding: 1rem 1.25rem;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .output-title { font-weight: 600; font-size: 0.9rem; display: flex; align-items: center; gap: 0.5rem; }
+    .output-actions { display: flex; gap: 0.5rem; }
+    .btn-sm {
+      padding: 0.35rem 0.8rem;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 0.78rem;
+      cursor: pointer;
+      background: var(--surface2);
+      color: var(--text);
+      transition: all 0.2s;
+    }
+    .btn-sm:hover { border-color: var(--accent); color: var(--accent); }
+    .btn-sm:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* ── View toggle ──────────────────────────────────────────────────────── */
+    .view-toggle {
+      display: flex;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 2px;
+    }
+    .view-btn {
+      padding: 0.25rem 0.65rem;
+      font-size: 0.75rem;
+      border: none;
+      background: transparent;
+      color: var(--muted);
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .view-btn.active { background: var(--accent); color: white; }
+
+    .output-body { padding: 0; height: calc(100vh - 220px); min-height: 400px; display: flex; flex-direction: column; }
+
+    /* ── Markdown output ──────────────────────────────────────────────────── */
+    #md-preview {
+      flex: 1;
+      padding: 1.5rem;
+      overflow-y: auto;
+      font-size: 0.875rem;
+      line-height: 1.7;
+    }
+    #md-preview h1 { font-size: 1.6rem; margin: 0 0 0.75rem; color: #f1f5f9; }
+    #md-preview h2 { font-size: 1.2rem; margin: 1.5rem 0 0.5rem; color: #e2e8f0; border-bottom: 1px solid var(--border); padding-bottom: 0.3rem; }
+    #md-preview h3 { font-size: 1rem; margin: 1rem 0 0.4rem; color: #cbd5e1; }
+    #md-preview p { margin: 0.5rem 0; }
+    #md-preview ul, #md-preview ol { padding-left: 1.5rem; margin: 0.4rem 0; }
+    #md-preview li { margin: 0.2rem 0; }
+    #md-preview code {
+      background: var(--code-bg);
+      padding: 0.15em 0.4em;
+      border-radius: 4px;
+      font-family: 'Fira Code', 'Cascadia Code', monospace;
+      font-size: 0.82em;
+      color: #a5b4fc;
+    }
+    #md-preview pre {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem;
+      overflow-x: auto;
+      margin: 0.75rem 0;
+    }
+    #md-preview pre code { background: none; padding: 0; color: #e2e8f0; font-size: 0.82rem; }
+    #md-preview blockquote {
+      border-left: 3px solid var(--accent);
+      padding-left: 1rem;
+      color: var(--muted);
+      margin: 0.75rem 0;
+    }
+    #md-preview table { border-collapse: collapse; width: 100%; margin: 0.75rem 0; font-size: 0.84rem; }
+    #md-preview th, #md-preview td { border: 1px solid var(--border); padding: 0.5rem 0.75rem; }
+    #md-preview th { background: var(--surface2); font-weight: 600; }
+    #md-preview hr { border: none; border-top: 1px solid var(--border); margin: 1rem 0; }
+    #md-preview strong { color: #f1f5f9; }
+    #md-preview a { color: var(--accent); }
+
+    /* ── Raw output ───────────────────────────────────────────────────────── */
+    #raw-output {
+      flex: 1;
+      padding: 1rem 1.25rem;
+      overflow-y: auto;
+      font-family: 'Fira Code', 'Cascadia Code', monospace;
+      font-size: 0.78rem;
+      line-height: 1.6;
+      color: #94a3b8;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    /* ── Status / placeholder ─────────────────────────────────────────────── */
+    .placeholder {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: var(--muted);
+      gap: 0.75rem;
+      padding: 2rem;
+    }
+    .placeholder-icon { font-size: 3rem; opacity: 0.3; }
+    .placeholder-text { font-size: 0.9rem; text-align: center; }
+
+    /* ── Spinner ──────────────────────────────────────────────────────────── */
+    .spinner {
+      width: 20px; height: 20px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      display: none;
+    }
+    .spinner.show { display: block; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Status bar ───────────────────────────────────────────────────────── */
+    .status-bar {
+      padding: 0.5rem 1.25rem;
+      border-top: 1px solid var(--border);
+      font-size: 0.75rem;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .status-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--muted);
+      flex-shrink: 0;
+    }
+    .status-dot.green { background: var(--green); box-shadow: 0 0 6px var(--green); }
+    .status-dot.yellow { background: var(--yellow); animation: pulse 1s infinite; }
+    .status-dot.red { background: var(--red); }
+    @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
+
+    /* ── Info box ─────────────────────────────────────────────────────────── */
+    .info-box {
+      background: rgba(99,102,241,0.08);
+      border: 1px solid rgba(99,102,241,0.25);
+      border-radius: 8px;
+      padding: 0.75rem;
+      font-size: 0.78rem;
+      color: #94a3b8;
+    }
+    .info-box strong { color: #a5b4fc; }
+
+    /* ── Scrollbar ────────────────────────────────────────────────────────── */
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+
+    /* ── Error ────────────────────────────────────────────────────────────── */
+    .error-msg {
+      background: rgba(239,68,68,0.1);
+      border: 1px solid rgba(239,68,68,0.3);
+      color: #fca5a5;
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      font-size: 0.83rem;
+      margin: 1rem;
+    }
+  </style>
+</head>
+<body>
+
+<header class="header">
+  <div>
+    <span class="logo">LocalAIdoc</span>
+    <span class="logo-sub">local & free</span>
+  </div>
+  <span class="badge">AI Docs Generator</span>
+</header>
+
+<div class="container">
+
+  <!-- ── Left: Config panel ──────────────────────────────────────────────── -->
+  <div style="display:flex;flex-direction:column;gap:1rem;">
+
+    <div class="panel">
+      <div class="panel-header">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg>
+        Source
+      </div>
+      <div class="panel-body">
+        <!-- Source type toggle -->
+        <div>
+          <div class="tabs">
+            <button class="tab active" onclick="setSourceType('github', this)">GitHub URL</button>
+            <button class="tab" onclick="setSourceType('local', this)">Local Folder</button>
+          </div>
+        </div>
+
+        <!-- GitHub input -->
+        <div id="github-input">
+          <label>Repository URL</label>
+          <input type="text" id="source-github" placeholder="https://github.com/owner/repo" />
+        </div>
+
+        <!-- Local input -->
+        <div id="local-input" style="display:none;">
+          <label>Folder Path</label>
+          <input type="text" id="source-local" placeholder="C:\Users\user\myproject  or  /home/user/project" />
+        </div>
+
+        <!-- Optional project name -->
+        <div>
+          <label>Project Name <span style="color:var(--muted)">(optional)</span></label>
+          <input type="text" id="project-name" placeholder="Auto-detected from URL/path" />
+        </div>
+
+        <!-- Scan button -->
+        <button class="btn-sm" onclick="scanFiles()" style="width:100%;text-align:center;">
+          🔍 Scan Files
+        </button>
+
+        <!-- File scan result -->
+        <div class="file-scan" id="file-scan">
+          <div class="file-scan-header">
+            <span id="file-count"></span>
+            <span style="color:var(--muted)" id="char-count"></span>
+          </div>
+          <div class="file-list" id="file-list"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Doc type -->
+    <div class="panel">
+      <div class="panel-header">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        Documentation Type
+      </div>
+      <div class="panel-body">
+        <div class="doc-types">
+          <div class="doc-card active" onclick="setDocType('readme', this)">
+            <div class="icon">📄</div>
+            <div class="name">README</div>
+            <div class="desc">Project overview</div>
+          </div>
+          <div class="doc-card" onclick="setDocType('api', this)">
+            <div class="icon">🔌</div>
+            <div class="name">API Ref</div>
+            <div class="desc">Endpoints & funcs</div>
+          </div>
+          <div class="doc-card" onclick="setDocType('architecture', this)">
+            <div class="icon">🏗️</div>
+            <div class="name">Architecture</div>
+            <div class="desc">System design</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AI Provider -->
+    <div class="panel">
+      <div class="panel-header">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
+        AI Provider
+      </div>
+      <div class="panel-body">
+        <div class="provider-tabs">
+          <button class="provider-btn active" onclick="setProvider('ollama', this)">🦙 Ollama</button>
+          <button class="provider-btn" onclick="setProvider('groq', this)">⚡ Groq</button>
+          <button class="provider-btn" onclick="setProvider('claude', this)">🤖 Claude</button>
+          <button class="provider-btn" onclick="setProvider('lmstudio', this)">🖥️ LM Studio</button>
+        </div>
+
+        <!-- Ollama fields -->
+        <div class="provider-fields show" id="fields-ollama">
+          <label>Model Name</label>
+          <input type="text" id="ollama-model" placeholder="llama3.2" value="llama3.2" />
+          <div id="ollama-model-list" style="font-size:0.75rem; color:var(--muted);"></div>
+          <div class="info-box">
+            Install: <a href="https://ollama.com" target="_blank">ollama.com</a><br/>
+            Then: <code>ollama pull llama3.2</code><br/>
+            Start: <code>ollama serve</code>
+          </div>
+        </div>
+
+        <!-- Groq fields -->
+        <div class="provider-fields" id="fields-groq">
+          <label>API Key (Free at console.groq.com)</label>
+          <input type="password" id="groq-key" placeholder="gsk_..." />
+          <label>Model</label>
+          <select id="groq-model">
+            <option value="llama-3.3-70b-versatile">llama-3.3-70b-versatile (best)</option>
+            <option value="llama-3.1-8b-instant">llama-3.1-8b-instant (fastest)</option>
+            <option value="llama3-70b-8192">llama3-70b-8192</option>
+            <option value="llama3-8b-8192">llama3-8b-8192</option>
+          </select>
+          <div class="info-box">
+            <strong>100% Free:</strong> Get key at <a href="https://console.groq.com" target="_blank">console.groq.com</a><br/>
+            Free tier: 14,400 req/day · Very fast inference
+          </div>
+        </div>
+
+        <!-- Claude fields -->
+        <div class="provider-fields" id="fields-claude">
+          <label>API Key</label>
+          <input type="password" id="claude-key" placeholder="sk-ant-..." />
+          <label>Model</label>
+          <select id="claude-model">
+            <option value="claude-opus-4-6">claude-opus-4-6 (eng kuchli)</option>
+            <option value="claude-sonnet-4-5-20250929">claude-sonnet-4-5 (tez)</option>
+            <option value="claude-haiku-4-5-20251001">claude-haiku-4-5 (eng tez)</option>
+          </select>
+          <div class="info-box">
+            Key oling: <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a>
+          </div>
+        </div>
+
+        <!-- LM Studio fields -->
+        <div class="provider-fields" id="fields-lmstudio">
+          <label>Base URL</label>
+          <input type="text" id="lmstudio-url" placeholder="http://localhost:1234/v1" value="http://localhost:1234/v1" />
+          <label>Model name</label>
+          <input type="text" id="lmstudio-model" placeholder="local-model" value="local-model" />
+          <div class="info-box">
+            Download <a href="https://lmstudio.ai" target="_blank">LM Studio</a>, load a model, and start the local server.
+          </div>
+        </div>
+
+        <!-- Generate button -->
+        <button class="btn-generate" id="btn-generate" onclick="generate()">
+          <div class="spinner" id="spinner"></div>
+          <span id="btn-text">✨ Generate Documentation</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Right: Output panel ─────────────────────────────────────────────── -->
+  <div class="panel output-panel">
+    <div class="output-header">
+      <div class="output-title">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        <span id="output-label">Documentation Output</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:0.5rem;">
+        <div class="view-toggle">
+          <button class="view-btn active" onclick="setView('preview', this)">Preview</button>
+          <button class="view-btn" onclick="setView('raw', this)">Raw</button>
+        </div>
+        <div class="output-actions">
+          <button class="btn-sm" id="btn-copy" onclick="copyOutput()" disabled>📋 Copy</button>
+          <button class="btn-sm" id="btn-download" onclick="downloadOutput()" disabled>⬇️ Download</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="output-body">
+      <div class="placeholder" id="placeholder">
+        <div class="placeholder-icon">📝</div>
+        <div class="placeholder-text">Configure your source and click<br/><strong>Generate Documentation</strong></div>
+      </div>
+      <div id="md-preview" style="display:none;"></div>
+      <div id="raw-output" style="display:none;"></div>
+      <div class="error-msg" id="error-msg" style="display:none;"></div>
+    </div>
+
+    <div class="status-bar">
+      <div class="status-dot" id="status-dot"></div>
+      <span id="status-text">Ready</span>
+    </div>
+  </div>
+
+</div>
+
+<!-- ── marked.js for Markdown rendering ──────────────────────────────────── -->
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script>
+  // ── State ────────────────────────────────────────────────────────────────
+  let sourceType = 'github';
+  let docType    = 'readme';
+  let provider   = 'ollama';
+  let rawText    = '';
+  let viewMode   = 'preview';
+  let generating = false;
+
+  // ── Init ──────────────────────────────────────────────────────────────────
+  window.addEventListener('load', () => {
+    fetchOllamaModels();
+    // Restore saved keys
+    const savedGroq = localStorage.getItem('groq_key');
+    if (savedGroq) document.getElementById('groq-key').value = savedGroq;
+  });
+
+  // ── Source type ───────────────────────────────────────────────────────────
+  function setSourceType(type, el) {
+    sourceType = type;
+    document.querySelectorAll('.tabs .tab').forEach(t => t.classList.remove('active'));
+    el.classList.add('active');
+    document.getElementById('github-input').style.display = type === 'github' ? '' : 'none';
+    document.getElementById('local-input').style.display  = type === 'local'  ? '' : 'none';
+    hideScan();
+  }
+
+  // ── Doc type ──────────────────────────────────────────────────────────────
+  function setDocType(type, el) {
+    docType = type;
+    document.querySelectorAll('.doc-card').forEach(c => c.classList.remove('active'));
+    el.classList.add('active');
+  }
+
+  // ── Provider ──────────────────────────────────────────────────────────────
+  function setProvider(p, el) {
+    provider = p;
+    document.querySelectorAll('.provider-btn').forEach(b => b.classList.remove('active'));
+    el.classList.add('active');
+    ['ollama','groq','lmstudio'].forEach(id => {
+      document.getElementById('fields-' + id).classList.remove('show');
+    });
+    document.getElementById('fields-' + p).classList.add('show');
+  }
+
+  // ── View mode ─────────────────────────────────────────────────────────────
+  function setView(mode, el) {
+    viewMode = mode;
+    document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
+    el.classList.add('active');
+    if (rawText) renderOutput(rawText);
+  }
+
+  // ── Get source ────────────────────────────────────────────────────────────
+  function getSource() {
+    return sourceType === 'github'
+      ? document.getElementById('source-github').value.trim()
+      : document.getElementById('source-local').value.trim();
+  }
+
+  // ── Ollama model list ─────────────────────────────────────────────────────
+  async function fetchOllamaModels() {
+    try {
+      const r = await fetch('/ollama/models');
+      const d = await r.json();
+      if (d.models && d.models.length > 0) {
+        document.getElementById('ollama-model-list').textContent =
+          'Available: ' + d.models.join(', ');
+      }
+    } catch {}
+  }
+
+  // ── Scan files ────────────────────────────────────────────────────────────
+  async function scanFiles() {
+    const source = getSource();
+    if (!source) { alert('Please enter a source first.'); return; }
+    setStatus('yellow', 'Scanning...');
+    try {
+      const r = await fetch('/scan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ source_type: sourceType, source })
+      });
+      const d = await r.json();
+      if (d.error) { setStatus('red', d.error); return; }
+      document.getElementById('file-count').textContent = `✅ ${d.file_count} files found`;
+      document.getElementById('char-count').textContent = `~${Math.round(d.total_chars/1000)}k chars`;
+      document.getElementById('file-list').textContent = d.files.join('\n');
+      document.getElementById('file-scan').classList.add('show');
+      setStatus('green', `${d.file_count} files ready`);
+    } catch(e) {
+      setStatus('red', 'Scan failed: ' + e.message);
+    }
+  }
+
+  function hideScan() {
+    document.getElementById('file-scan').classList.remove('show');
+  }
+
+  // ── Generate ──────────────────────────────────────────────────────────────
+  async function generate() {
+    if (generating) return;
+    const source = getSource();
+    if (!source) { alert('Please enter a GitHub URL or local folder path.'); return; }
+
+    // API key validation
+    if (provider === 'groq') {
+      const key = document.getElementById('groq-key').value.trim();
+      if (!key) { alert('Please enter your Groq API key.'); return; }
+      localStorage.setItem('groq_key', key);
+    }
+    if (provider === 'claude') {
+      const key = document.getElementById('claude-key').value.trim();
+      if (!key) { alert('Please enter your Anthropic API key.'); return; }
+      localStorage.setItem('claude_key', key);
+    }
+
+    generating = true;
+    rawText = '';
+    setGenerating(true);
+    showPlaceholder(false);
+    showError(null);
+    document.getElementById('md-preview').style.display = 'none';
+    document.getElementById('raw-output').style.display = 'none';
+    document.getElementById('btn-copy').disabled = true;
+    document.getElementById('btn-download').disabled = true;
+
+    const docNames = { readme: 'README.md', api: 'API_REFERENCE.md', architecture: 'ARCHITECTURE.md' };
+    document.getElementById('output-label').textContent = 'Generating ' + docNames[docType] + '...';
+    setStatus('yellow', 'Generating...');
+
+    const payload = {
+      source_type:  sourceType,
+      source,
+      doc_type:     docType,
+      provider,
+      model:        getModel(),
+      api_key:      getApiKey(),
+      base_url:     provider === 'lmstudio' ? document.getElementById('lmstudio-url').value.trim() : '',
+      project_name: document.getElementById('project-name').value.trim()
+    };
+
+    // Show output area with raw view during streaming
+    if (viewMode === 'raw') {
+      document.getElementById('raw-output').style.display = 'block';
+      document.getElementById('raw-output').textContent = '';
+    } else {
+      document.getElementById('md-preview').style.display = 'block';
+      document.getElementById('md-preview').innerHTML = '<span style="color:var(--muted)">Analyzing codebase...</span>';
+    }
+
+    try {
+      const response = await fetch('/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      const reader  = response.body.getReader();
+      const decoder = new TextDecoder();
+      let   buffer  = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop();
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          try {
+            const data = JSON.parse(line.slice(6));
+            if (data.error) {
+              showError(data.error);
+              setStatus('red', 'Error');
+              generating = false;
+              setGenerating(false);
+              return;
+            }
+            if (data.info) {
+              setStatus('yellow', data.info.trim());
+            }
+            if (data.token) {
+              rawText += data.token;
+              renderOutput(rawText);
+            }
+            if (data.done) {
+              setStatus('green', 'Done!');
+              document.getElementById('output-label').textContent = docNames[docType];
+              document.getElementById('btn-copy').disabled = false;
+              document.getElementById('btn-download').disabled = false;
+            }
+          } catch {}
+        }
+      }
+    } catch(e) {
+      showError('Connection error: ' + e.message);
+      setStatus('red', 'Failed');
+    }
+
+    generating = false;
+    setGenerating(false);
+  }
+
+  function getModel() {
+    if (provider === 'ollama')   return document.getElementById('ollama-model').value.trim();
+    if (provider === 'groq')     return document.getElementById('groq-model').value;
+    if (provider === 'claude')   return document.getElementById('claude-model').value;
+    if (provider === 'lmstudio') return document.getElementById('lmstudio-model').value.trim();
+    return '';
+  }
+  function getApiKey() {
+    if (provider === 'groq')   return document.getElementById('groq-key').value.trim();
+    if (provider === 'claude') return document.getElementById('claude-key').value.trim();
+    return '';
+  }
+
+  // ── Render ────────────────────────────────────────────────────────────────
+  function renderOutput(text) {
+    if (viewMode === 'preview') {
+      document.getElementById('md-preview').style.display = 'block';
+      document.getElementById('raw-output').style.display = 'none';
+      try {
+        document.getElementById('md-preview').innerHTML = marked.parse(text);
+        // Auto-scroll to bottom while streaming
+        const el = document.getElementById('md-preview');
+        el.scrollTop = el.scrollHeight;
+      } catch {
+        document.getElementById('md-preview').textContent = text;
+      }
+    } else {
+      document.getElementById('raw-output').style.display = 'block';
+      document.getElementById('md-preview').style.display = 'none';
+      document.getElementById('raw-output').textContent = text;
+      const el = document.getElementById('raw-output');
+      el.scrollTop = el.scrollHeight;
+    }
+  }
+
+  // ── Copy & Download ───────────────────────────────────────────────────────
+  function copyOutput() {
+    if (!rawText) return;
+    navigator.clipboard.writeText(rawText).then(() => {
+      const btn = document.getElementById('btn-copy');
+      const orig = btn.textContent;
+      btn.textContent = '✅ Copied!';
+      setTimeout(() => btn.textContent = orig, 2000);
+    });
+  }
+
+  function downloadOutput() {
+    if (!rawText) return;
+    const names = { readme: 'README.md', api: 'API_REFERENCE.md', architecture: 'ARCHITECTURE.md' };
+    const filename = names[docType] || 'documentation.md';
+    const blob = new Blob([rawText], { type: 'text/markdown' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+  function setGenerating(on) {
+    document.getElementById('btn-generate').disabled = on;
+    document.getElementById('spinner').classList.toggle('show', on);
+    document.getElementById('btn-text').textContent = on ? 'Generating...' : '✨ Generate Documentation';
+  }
+
+  function showPlaceholder(show) {
+    document.getElementById('placeholder').style.display = show ? 'flex' : 'none';
+  }
+
+  function showError(msg) {
+    const el = document.getElementById('error-msg');
+    if (msg) {
+      el.textContent = '❌ ' + msg;
+      el.style.display = 'block';
+      showPlaceholder(false);
+    } else {
+      el.style.display = 'none';
+    }
+  }
+
+  function setStatus(color, text) {
+    const dot = document.getElementById('status-dot');
+    dot.className = 'status-dot ' + color;
+    document.getElementById('status-text').textContent = text;
+  }
+</script>
+</body>
+</html>
