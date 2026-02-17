@@ -8,8 +8,12 @@ from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 import requests
 import json
+import os
 import pathlib
 from typing import Generator
+from dotenv import load_dotenv
+
+load_dotenv()
 
 app = FastAPI(title="LocalAIdoc", description="AI-powered documentation generator")
 templates = Jinja2Templates(directory="templates")
@@ -530,8 +534,10 @@ async def list_ollama_models():
 # ─── Entry point ──────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     import uvicorn
+    host = os.getenv("HOST", "0.0.0.0")
+    port = int(os.getenv("PORT", "8000"))
     print("\n" + "="*50)
     print("  LocalAIdoc - AI Documentation Generator")
-    print("  Open: http://localhost:8000")
+    print(f"  Open: http://localhost:{port}")
     print("="*50 + "\n")
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("main:app", host=host, port=port, reload=True)
