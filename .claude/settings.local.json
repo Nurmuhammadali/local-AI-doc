@@ -1,8 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(py main.py:*)",
-      "Bash(py:*)"
-    ]
-  }
-}

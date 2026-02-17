@@ -19,6 +19,9 @@ env/
 .env
 .env.local
 
+# Claude Code
+.claude/settings.local.json
+
 # IDE
 .vscode/
 .idea/
